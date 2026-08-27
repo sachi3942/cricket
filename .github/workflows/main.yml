@@ -8,6 +8,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      HAS_SIGNING: ${{ secrets.KEYSTORE_BASE64 != '' }}
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -46,7 +48,6 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x cricket-game/android/gradlew
 
-      # ---------- Always build a debug APK (install directly on a phone to test) ----------
       - name: Build debug APK
         working-directory: cricket-game/android
         run: ./gradlew assembleDebug
@@ -57,13 +58,12 @@ jobs:
           name: app-debug-apk
           path: cricket-game/android/app/build/outputs/apk/debug/app-debug.apk
 
-      # ---------- Signed release build (only runs once you add the 4 secrets below) ----------
       - name: Decode keystore
-        if: ${{ secrets.KEYSTORE_BASE64 != '' }}
+        if: env.HAS_SIGNING == 'true'
         run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > cricket-game/android/app/release.keystore
 
       - name: Add signing config
-        if: ${{ secrets.KEYSTORE_BASE64 != '' }}
+        if: env.HAS_SIGNING == 'true'
         working-directory: cricket-game/android/app
         run: |
           cat >> build.gradle << 'EOF'
@@ -86,7 +86,7 @@ jobs:
           EOF
 
       - name: Build signed release AAB (for Play Store)
-        if: ${{ secrets.KEYSTORE_BASE64 != '' }}
+        if: env.HAS_SIGNING == 'true'
         working-directory: cricket-game/android
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
@@ -95,7 +95,7 @@ jobs:
         run: ./gradlew bundleRelease
 
       - name: Upload release AAB
-        if: ${{ secrets.KEYSTORE_BASE64 != '' }}
+        if: env.HAS_SIGNING == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: app-release-aab
